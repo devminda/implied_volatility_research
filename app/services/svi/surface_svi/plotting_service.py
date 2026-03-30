@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.models.svi.surface_svi.model import SSVIFormula
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -7,27 +8,37 @@ import matplotlib.pyplot as plt
 class SSVIPlottingService:
 
     @staticmethod
-    def plot_smiles(
+    def plot_smiles_by_maturity(
         k_grid,
-        thetas,
+        maturities,
+        theta_of_t,
         ssvi_model,
-        maturity: float,
         show: bool = True,
     ):
-        """
-        Plot implied volatility smiles for multiple theta values.
-        """
-        for theta in thetas:
-            w = ssvi_model.evaluate(k_grid, theta)
-            iv = np.sqrt(np.maximum(w, 0.0) / maturity)
+        k_grid    = np.asarray(k_grid, dtype=float)
+        maturities = np.asarray(maturities, dtype=float)
 
-            plt.plot(k_grid, iv, label=f"theta={theta:.3f}")
+        # Use build_iv_surface for consistency — avoids duplicating the
+        # theta->w->iv logic that already lives in the model
+        kk, TT, w, iv = SSVIFormula.build_iv_surface(
+            k_grid=k_grid,
+            T_grid=maturities,
+            model=ssvi_model,
+            theta_func=theta_of_t,
+        )
 
-        plt.xlabel("log-moneyness k = ln(K/F)")
+        plt.figure(figsize=(10, 6))
+
+        for i, T in enumerate(maturities):
+            theta = float(theta_of_t(T))
+            plt.plot(k_grid, iv[i, :], label=f"T={T:.2f}, θ={theta:.3f}")
+
+        plt.xlabel("Log-moneyness k = ln(K/F)")
         plt.ylabel("Implied Volatility")
         plt.title("SSVI Implied Volatility Smiles")
-        plt.legend()
+        plt.legend(fontsize=7)
         plt.grid(True)
+        plt.tight_layout()
 
         if show:
             plt.show()
@@ -39,63 +50,116 @@ class SSVIPlottingService:
         ssvi_model,
         show: bool = True,
     ):
-        """
-        Plot total variance curves.
-        """
+        k_grid = np.asarray(k_grid, dtype=float)
+        thetas = np.asarray(thetas, dtype=float)
+
+        plt.figure(figsize=(10, 6))
+
         for theta in thetas:
             w = ssvi_model.evaluate(k_grid, theta)
-            plt.plot(k_grid, w, label=f"theta={theta:.3f}")
+            plt.plot(k_grid, w, label=f"θ={theta:.3f}")
 
-        plt.xlabel("log-moneyness k = ln(K/F)")
+        plt.xlabel("Log-moneyness k = ln(K/F)")
         plt.ylabel("Total Variance")
         plt.title("SSVI Total Variance Curves")
         plt.legend()
         plt.grid(True)
+        plt.tight_layout()
 
         if show:
             plt.show()
-    
+
     @staticmethod
-    def plot_total_variance_surface(
+    def plot_implied_vol_surface(
+        k_grid,
+        maturity_grid,
+        theta_of_t,
+        ssvi_model,
+        show: bool = True,
+        cmap: str = "turbo",
+    ) -> None:
+        """
+        Plot implied volatility surface sigma_BS(k, T).
+        """
+        k_grid = np.asarray(k_grid, dtype=float)
+        maturity_grid = np.asarray(maturity_grid, dtype=float)
+
+        kk, TT, w, iv_surface = SSVIFormula.build_iv_surface(
+            k_grid=k_grid,
+            T_grid=maturity_grid,
+            model=ssvi_model,
+            theta_func=theta_of_t,
+        )
+
+        fig = plt.figure(figsize=(12, 8))
+        ax = fig.add_subplot(111, projection="3d")
+
+        surf = ax.plot_surface(
+            kk,
+            TT,
+            iv_surface,
+            cmap=cmap,
+            linewidth=0,
+            antialiased=True,
+        )
+
+        ax.set_xlabel("Log-moneyness k = ln(K/F)", labelpad=12)
+        ax.set_ylabel("Maturity T", labelpad=12)
+        ax.set_zlabel("Implied Volatility σ_BS(k, T)", labelpad=14)
+        ax.set_title("SSVI Implied Volatility Surface", pad=18)
+
+        ax.view_init(elev=25, azim=-60)
+
+        fig.colorbar(surf, ax=ax, shrink=0.7, aspect=18, pad=0.08)
+
+        plt.tight_layout()
+
+        if show:
+            plt.show()
+
+    @staticmethod
+    def plot_total_variance_surface_in_theta_space(
         k_grid,
         theta_grid,
         ssvi_model,
         show: bool = True,
+        cmap: str = "turbo",
     ) -> None:
         """
         Plot the SSVI total variance surface w(k, theta).
-
-        Parameters
-        ----------
-        k_grid : array-like
-            Log-moneyness grid.
-        theta_grid : array-like
-            ATM total variance grid.
-        ssvi_model : object
-            Model with evaluate(k, theta) method.
-        show : bool
-            Whether to display the plot immediately.
+        This is the mathematical SSVI surface in theta-space.
         """
         k_grid = np.asarray(k_grid, dtype=float)
         theta_grid = np.asarray(theta_grid, dtype=float)
 
-        kk, tt = np.meshgrid(k_grid, theta_grid)
-
+        kk, theta_mesh = np.meshgrid(k_grid, theta_grid)
         w_surface = np.zeros_like(kk, dtype=float)
 
-        for i in range(tt.shape[0]):
-            for j in range(tt.shape[1]):
-                w_surface[i, j] = ssvi_model.evaluate(kk[i, j], tt[i, j])
+        for i in range(theta_mesh.shape[0]):
+            w_surface[i, :] = ssvi_model.evaluate(k_grid, theta_mesh[i, 0])
 
-        fig = plt.figure(figsize=(9, 6))
+        fig = plt.figure(figsize=(12, 8))
         ax = fig.add_subplot(111, projection="3d")
 
-        ax.plot_surface(kk, tt, w_surface, cmap="viridis")
+        surf = ax.plot_surface(
+            kk,
+            theta_mesh,
+            w_surface,
+            cmap=cmap,
+            linewidth=0,
+            antialiased=True,
+        )
 
-        ax.set_xlabel("Log-moneyness k = ln(K/F)")
-        ax.set_ylabel("ATM total variance theta")
-        ax.set_zlabel("Total variance w(k, theta)")
-        ax.set_title("SSVI Total Variance Surface")
+        ax.set_xlabel("Log-moneyness k = ln(K/F)", labelpad=12)
+        ax.set_ylabel("ATM Total Variance θ", labelpad=12)
+        ax.set_zlabel("Total Variance w(k, θ)", labelpad=14)
+        ax.set_title("SSVI Total Variance Surface in θ-space", pad=18)
+
+        ax.view_init(elev=25, azim=-60)
+
+        fig.colorbar(surf, ax=ax, shrink=0.7, aspect=18, pad=0.08)
+
+        plt.tight_layout()
 
         if show:
             plt.show()
