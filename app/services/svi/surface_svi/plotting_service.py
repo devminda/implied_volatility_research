@@ -163,3 +163,40 @@ class SSVIPlottingService:
 
         if show:
             plt.show()
+    
+    @staticmethod
+    def plot_local_vol_surface(
+        k_grid,
+        maturity_grid,
+        theta_of_t,
+        ssvi_model,
+        show: bool = True,
+        cmap: str = "turbo",
+    ) -> None:
+        """Local vol surface — smoother than implied vol due to Dupire division by g."""
+        k_grid        = np.asarray(k_grid, dtype=float)
+        maturity_grid = np.asarray(maturity_grid, dtype=float)
+
+        kk, TT, lv = SSVIFormula.build_local_vol_surface(
+            k_grid=k_grid,
+            T_grid=maturity_grid,
+            model=ssvi_model,
+            theta_func=theta_of_t,
+        )
+
+        fig = plt.figure(figsize=(12, 8))
+        ax  = fig.add_subplot(111, projection="3d")
+
+        surf = ax.plot_surface(kk, TT, lv, cmap=cmap, linewidth=0, antialiased=True)
+
+        ax.set_xlabel("Log-moneyness k = ln(K/F)", labelpad=12)
+        ax.set_ylabel("Maturity T", labelpad=12)
+        ax.set_zlabel("Local Variance", labelpad=14)
+        ax.set_title("SSVI Local Variance Surface", pad=18)
+        ax.view_init(elev=25, azim=-60)
+
+        fig.colorbar(surf, ax=ax, shrink=0.7, aspect=18, pad=0.08)
+        plt.tight_layout()
+
+        if show:
+            plt.show()

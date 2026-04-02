@@ -28,10 +28,10 @@ def run_example(prefix: str, phi, rho: float = -0.7, n_k: int = 100):
 
 def main():
     run_example("heston_like",          HestonLikePhi(lam=2.0))
-    run_example("power_law",            PowerLawPhi(eta=1.0, gamma=0.5),            n_k=150)
-    run_example("stabilized_power_law", StabilizedPowerLawPhi(eta=0.3, gamma=0.5),  n_k=150)
+    run_example("power_law",            PowerLawPhi(eta=1.0, gamma=0.8),            n_k=150)
+    run_example("stabilized_power_law", StabilizedPowerLawPhi(eta=0.3, gamma=0.8),  n_k=150)
     eta = 0.3
-    rho = -0.7
+    rho = -0.4
     print(eta * (1 + abs(rho)))
 
 if __name__ == "__main__":

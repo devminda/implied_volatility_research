@@ -165,6 +165,29 @@ class SSVIResultStore:
 
         return file_path
 
+    def save_local_vol_surface(
+        self,
+        k_grid,
+        maturity_grid,
+        theta_of_t,
+        ssvi_model,
+        filename: str = "local_vol_surface.png",
+    ) -> Path:
+        output_dir = self.ensure_output_dir()
+        file_path  = output_dir / filename
+
+        SSVIPlottingService.plot_local_vol_surface(
+            k_grid=k_grid,
+            maturity_grid=maturity_grid,
+            theta_of_t=theta_of_t,
+            ssvi_model=ssvi_model,
+            show=False,
+        )
+
+        plt.savefig(file_path, bbox_inches="tight", dpi=150)
+        plt.close()
+
+        return file_path
     
     def save_all(
         self,
@@ -215,10 +238,19 @@ class SSVIResultStore:
             filename=f"{prefix_str}implied_vol_surface.png",
         )
 
+        local_vol_surface = self.save_local_vol_surface(
+            k_grid=k_grid,
+            maturity_grid=maturity_grid,
+            theta_of_t=theta_of_t,
+            ssvi_model=ssvi_model,
+            filename=f"{prefix_str}local_vol_surface.png",
+        )
+
         return {
             "surface_csv":            str(surface_csv),
             "total_variance_plot":    str(total_variance_plot),
             "implied_vol_plot":       str(implied_vol_plot),
             "total_variance_surface": str(total_variance_surface),
             "implied_vol_surface":    str(implied_vol_surface),
+            "local_vol_surface":      str(local_vol_surface),
         }
